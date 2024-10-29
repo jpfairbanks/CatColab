@@ -250,26 +250,110 @@ where
         m.clone()
     }
 
-    fn compose_types(&self, path: Path<C::Ob, C::Mor>) -> C::Mor {
+    fn compose_types(&self, path: Path<Self::ObType, Self::MorType>) -> Self::MorType {
         self.0.compose(path)
     }
 
-    fn compose_ob_ops(&self, path: Path<C::Ob, C::Ob>) -> C::Ob {
+    fn compose_ob_ops(&self, path: Path<Self::ObType,Self::ObOp>) -> Self::ObOp {
         let disc = DiscreteCategory::ref_cast(ObSet::ref_cast(&self.0));
         disc.compose(path)
     }
 
-    fn compose_mor_ops(&self, pasting: DblPasting<C::Ob, C::Ob, C::Mor, C::Mor>) -> C::Mor {
+    fn compose_mor_ops(&self, pasting: DblPasting<Self::ObType,Self::ObOp,Self::MorType,Self::MorOp>) -> Self::MorOp {
         match pasting {
             DblPasting::ObId(x) => self.0.id(x),
             DblPasting::ArrId(fs) => self.0.id(self.compose_ob_ops(Path::Seq(fs))),
             DblPasting::ProId(ms) => self.compose_types(Path::Seq(ms)),
-            DblPasting::Diagram(_) => panic!("General pasting not implemented"),
+            DblPasting::Diagram(_) => panic!("General pasting not yet implemented 😢"),
         }
     }
 }
 
 impl<C: FgCategory + Validate> Validate for DiscreteDblTheory<C> {
+    type ValidationError = C::ValidationError;
+
+    fn validate(&self) -> Result<(), nonempty::NonEmpty<Self::ValidationError>> {
+        self.0.validate()
+    }
+}
+
+/** A tight double theory.
+
+A **tight double theory** is a double theory with no nontrivial morphism types 
+or morphism operations. Viewed as a double category, such a theory is
+**tight** or **vertical**; its underlying graph is discrete as a 
+graph of categories.
+*/
+#[derive(From, RefCast, Debug)]
+#[repr(transparent)]
+pub struct TightDblTheory<Cat: FgCategory>(Cat);
+
+/// A tight double theory with keys of type `Ustr`.
+pub type UstrTightDblTheory = TightDblTheory<UstrFinCategory>;
+
+impl<C: FgCategory> DblTheory for TightDblTheory<C>
+where
+    C::Ob: Clone,
+    C::Mor: Clone,
+{
+    type ObType = C::Ob;
+    type ObOp = C::Mor;
+    type MorType = C::Ob;
+    type MorOp = C::Mor;
+
+    fn has_ob_type(&self, x: &Self::ObType) -> bool {
+        self.0.has_ob(x)
+    }
+    fn has_mor_type(&self, m: &Self::MorType) -> bool {
+        self.0.has_ob(m)
+    }
+
+    fn src(&self, x: &Self::MorType) -> Self::ObType {
+        x.clone()
+    }
+    fn tgt(&self, x: &Self::MorType) -> Self::ObType {
+        x.clone()
+    }
+    fn dom(&self, m: &Self::ObOp) -> Self::ObType {
+        self.0.dom(m)
+    }
+    fn cod(&self, m: &Self::ObOp) -> Self::ObType {
+        self.0.cod(m)
+    }
+
+    fn op_src(&self, m: &Self::MorOp) -> Self::ObOp {
+        m.clone()
+    }
+    fn op_tgt(&self, m: &Self::MorOp) -> Self::ObOp {
+        m.clone()
+    }
+    fn op_dom(&self, m: &Self::MorOp) -> Self::MorType {
+        self.0.dom(m)
+    }
+    fn op_cod(&self, m: &Self::MorOp) -> Self::MorType {
+        self.0.cod(m)
+    }
+
+    fn compose_types(&self, path: Path<Self::ObType, Self::MorType>) -> Self::MorType {
+        let disc = DiscreteCategory::ref_cast(ObSet::ref_cast(&self.0));
+        disc.compose(path)
+    }
+
+    fn compose_ob_ops(&self, path: Path<Self::ObType,Self::ObOp>) -> Self::ObOp {
+        self.0.compose(path)
+    }
+
+    fn compose_mor_ops(&self, pasting: DblPasting<Self::ObType,Self::ObOp,Self::MorType,Self::MorOp>) -> Self::MorOp {
+        match pasting {
+            DblPasting::ObId(x) => self.0.id(x),
+            DblPasting::ArrId(fs) => self.compose_ob_ops(Path::Seq(fs)),
+            DblPasting::ProId(ms) => self.0.id(self.compose_types(Path::Seq(ms))), 
+            DblPasting::Diagram(_) => panic!("General pasting not yet implemented 😢"),
+        }
+    }
+}
+
+impl<C: FgCategory + Validate> Validate for TightDblTheory<C> {
     type ValidationError = C::ValidationError;
 
     fn validate(&self) -> Result<(), nonempty::NonEmpty<Self::ValidationError>> {
@@ -540,6 +624,24 @@ mod tests {
         assert_eq!(th.compose_types(path), Mor::Id('*'));
     }
 
+    #[test]
+    fn tight_double_theory() {
+        type Mor<V, E> = FinMor<V, E>;
+
+        let mut sgn: FinCategory<char, char> = Default::default();
+        sgn.add_ob_generator('*');
+        sgn.add_mor_generator('n', '*', '*');
+        sgn.set_composite('n', 'n', Mor::Id('*'));
+
+        let th = TightDblTheory::from(sgn);
+        assert!(th.has_ob_type(&'*'));
+        let path = Path::pair(Mor::Generator('n'), Mor::Generator('n'));
+        let path2 = Path::pair('*','*');
+        let path3 = Path::pair(Mor::Generator('n'), Mor::Id('*'));
+        assert_eq!(th.compose_ob_ops(path), Mor::Id('*'));
+        assert_eq!(th.compose_types(path2), '*');
+        assert_eq!(th.compose_ob_ops(path3), Mor::Generator('n'));
+    }
     #[test]
     fn discrete_tabulator_theory() {
         let mut th = DiscreteTabTheory::<char, char>::new();

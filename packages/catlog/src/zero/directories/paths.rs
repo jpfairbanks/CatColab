@@ -8,6 +8,7 @@ use archery::{SharedPointer, SharedPointerKind};
 /// a directory.
 ///
 /// NOTE: This might conflict with paths for graphs?
+/// Yeah, this at least interferes with VSCode def search.
 ///
 /// NOTE: It might be more efficient to use a SmallVec instead of a linked list?
 #[derive(Debug)]
