@@ -45,7 +45,10 @@ export function HelpButton() {
         );
     } else {
         return (
-            <IconButton onClick={() => navigate(`"help/theory_documentation/${setSelectedTheory()}}.mdx"`)} tooltip="Learn more about theory">
+            <IconButton
+                onClick={() => navigate(`"help/theory_documentation/${setSelectedTheory()}}.mdx"`)}
+                tooltip="Learn more about theory"
+            >
                 <CircleHelp />
             </IconButton>
         );
